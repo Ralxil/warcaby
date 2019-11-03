@@ -18,9 +18,10 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import java.util.Arrays;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 
 
 /**
@@ -45,7 +46,6 @@ public class board extends JPanel implements Runnable{
     private BufferedImage qk;
     private JLabel JL;
     private JFrame JF;
-    private JLabel END;
     /**
      * 
      * Plansza gry,
@@ -56,18 +56,19 @@ public class board extends JPanel implements Runnable{
      * @throws IOException 
      */
     
-    public board(JPanel P, Socket CS, JLabel JL, JFrame JF, JLabel END) throws IOException{
+    public board(JPanel P, Socket CS, JLabel JL, JFrame JF) throws IOException{
         P.add(this);
         this.setCS(CS);
         this.JL=JL;
         this.JF=JF;
-        this.END=END;
         this.is = this.getCS().getInputStream();
         this.os = this.getCS().getOutputStream();
         this.setLocation(0, 0);
         this.setSize(800, 800);
         this.setVisible(true);
         f = new char[3][8][8];
+        this.G='w';
+        this.w='0';
         this.setB(ImageIO.read(new File("obrazy/board.jpg")));
         this.setP(ImageIO.read(new File("obrazy/red.png")));
         this.setPK(ImageIO.read(new File("obrazy/red_cross.png")));
@@ -80,10 +81,12 @@ public class board extends JPanel implements Runnable{
                 try {
                     int x, y;
                     String Z;
-                    x=e.getX()/100;
-                    y=e.getY()/100;
-                    Z=Integer.toString(y)+Integer.toString(x);
-                    os.write(Z.getBytes());
+                    if(G==w){
+                        x=e.getX()/100;
+                        y=e.getY()/100;
+                        Z=Integer.toString(y)+Integer.toString(x);
+                        os.write(Z.getBytes());
+                    }
                 } catch (IOException ex) {
                     Logger.getLogger(board.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -142,17 +145,15 @@ public class board extends JPanel implements Runnable{
                 load(buffer);
                 Arrays.fill(buffer, (byte)'0');
                 this.repaint();
-                if(this.getG()==this.getW()) JL.setText("Your Trun");
-                else JL.setText("Oponent Trun");
+                if(this.getG()==this.getW()) JL.setText("Twoj ruch");
+                else JL.setText("Ruch przeciwnika");
                 if((this.getW()=='l')||(this.getW()=='w')) play=false;
             }
-            JF.setSize(JF.getPreferredSize());
-            JF.setLocationRelativeTo(null);
-            JF.setVisible(true);
-            if(this.getW()=='w') END.setText("YOU WIN");
-            else END.setText("YOU LOSE");
+            if(this.getW()=='w') JOptionPane.showMessageDialog(null, "Wygrales\n");
+            else JOptionPane.showMessageDialog(null, "Prezgrales\n");
             this.getCS().close();
             this.getParent().remove(this);
+            this.JF.setVisible(false);
         } catch (IOException ex) {
             Logger.getLogger(board.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -166,8 +167,10 @@ public class board extends JPanel implements Runnable{
      * @param buff Tablica typu 'byte'.
      * 
      */
-    public void load(byte[] buff){
+    public void load(byte[] buff) throws IOException{
         String CON = new String(buff);
+        String Res = "1";
+        os.write(Res.getBytes());
         char[] C=CON.toCharArray();
         int i, j, z, l=0;
         for(z=0; z<3;z++){

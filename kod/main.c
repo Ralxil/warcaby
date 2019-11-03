@@ -290,6 +290,7 @@ struct thread_data_t
 int write_game(int sd, struct board *b, char p){
     int x, i, j, z;
     char buff[194];
+    char R[1];
     x=0;
     for(z=0; z<3; z++){
         for(i=0; i<8; i++){
@@ -302,16 +303,18 @@ int write_game(int sd, struct board *b, char p){
     buff[x]=p;
     if(b->S==true) buff[x+1]='t';
     else buff[x+1]='f';
-    x= write(sd, buff, sizeof(buff));
+    write(sd, buff, sizeof(buff));
+    x = read(sd, R, sizeof(R));
     return x;
 }
 
 
-void *ThreadBehavior(void *t_data)//TO DO
+void *ThreadBehavior(void *t_data)
 {
     pthread_detach(pthread_self());
     struct thread_data_t *th_data = (struct thread_data_t*)t_data;
     struct board *b;
+	bool match=true;
     char p1='q', p2='p', c;
     int x[2];
     char r[2];
@@ -321,50 +324,78 @@ void *ThreadBehavior(void *t_data)//TO DO
     new_game(b);
     //write b->f do p1 graj
     G=write_game(th_data->sd1, b, p1);
-    if(G<1) write_game(th_data->sd2, b, 'w');
+    if(G<1) {
+		match=false;
+		write_game(th_data->sd2, b, 'w');
+	}
     //write b->f do p2 czekaj
-    G=write_game(th_data->sd2, b, p2);
-    if(G<1) write_game(th_data->sd1, b, 'w');
-	M=th_data->sd1;
-	S=th_data->sd2;
-    while((b->p>0)&&(b->q>0))
+    if(match)
     {
-        while(b->A)
+        G=write_game(th_data->sd2, b, p2);
+        if(G<1) {
+            match=false;
+            write_game(th_data->sd1, b, 'w');
+        }
+        M=th_data->sd1;
+        S=th_data->sd2;
+    }
+    while((b->p>0)&&(b->q>0)&&(match==true))
+    {
+        do
         {
 			sleep(1);
-            //write b->f do p1 graj
-			G=write_game(M, b, p1);
-            if(G<1) write_game(S, b, 'w');
-            //write b->f do p2 cekaj
-            G=write_game(S, b, p1);
-            if(G<1) write_game(M, b, 'w');
-            //read x od p1
-            G=read(M, r, sizeof(r));
-			if(G<1) write_game(S, b, 'w');
-            x[0]=(int)r[0]-48;
-            x[1]=(int)r[1]-48;
-            if(b->S){
-                attack(b, x[0], x[1], p1, p2);
-                if(b->A==true) check_attack(b, x[0], x[1], p1, p2);
+            if(match){
+                //write b->f do p1 graj
+                G=write_game(M, b, p1);
+                if(G<1) {
+                    match=false;
+                    write_game(S, b, 'w');
+                }
+            }
+            if(match){
+                //write b->f do p2 cekaj
+                G=write_game(S, b, p1);
+                if(G<1) {
+                    match=false;
+                    write_game(M, b, 'w');
+                }
+            }
+            if(match){
+                //read x od p1
+                G=read(M, r, sizeof(r));
+                if(G<1) {
+                    match=false;
+                    write_game(S, b, 'w');
+                }
+            }
+            if(match){
+                x[0]=(int)r[0]-48;
+                x[1]=(int)r[1]-48;
+                if(b->S){
+                    attack(b, x[0], x[1], p1, p2);
+                    if(b->A==true) check_attack(b, x[0], x[1], p1, p2);
+                }
+                else{
+                    move(b, x[0], x[1]);
+                    if(b->A==true) check_move(b, x[0], x[1], p1);
+                }
+            }
+        }while((b->A)&&(match==true));
+        if(match){
+            if(M==th_data->sd1){
+                M=th_data->sd2;
+                S=th_data->sd1;
             }
             else{
-                move(b, x[0], x[1]);
-                if(b->A==true) check_move(b, x[0], x[1], p1);
+                M=th_data->sd1;
+                S=th_data->sd2;
             }
+            b->A=true;
+            c=p1;
+            p1=p2;
+            p2=c;
+            search_attack(b, p1, p2);
         }
-		if(M==th_data->sd1){
-			M=th_data->sd2;
-			S=th_data->sd1;
-		}
-		else{
-			M=th_data->sd1;
-			S=th_data->sd2;
-		}
-        b->A=true;
-        c=p1;
-        p1=p2;
-        p2=c;
-        search_attack(b, p1, p2);
     }
     if(b->p==0){
             write_game(th_data->sd1, b, 'w');
